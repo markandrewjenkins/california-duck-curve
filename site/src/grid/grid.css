@@ -1,0 +1,27 @@
+body.grid-page {
+  --accent: #eb6834; --demand: #2a78d6; --net: #eb6834; --caiso: #858379;
+  --nuclear: #4a3aa7; --wind: #1baf7a; --hydro: #2a78d6; --imports: #e87ba4; --solar: #eda100; --other: #b8b6ae; --gas: #eb6834;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) body.grid-page { --accent: #d95926; --demand: #3987e5; --net: #d95926;
+    --nuclear: #9085e9; --wind: #199e70; --hydro: #3987e5; --imports: #d55181; --solar: #c98500; --other: #5c5a62; --gas: #d95926; }
+}
+:root[data-theme="dark"] body.grid-page { --accent: #d95926; --demand: #3987e5; --net: #d95926;
+  --nuclear: #9085e9; --wind: #199e70; --hydro: #3987e5; --imports: #d55181; --solar: #c98500; --other: #5c5a62; --gas: #d95926; }
+
+.hero { padding: 56px 0 8px; background:
+  radial-gradient(900px 340px at 85% -20%, color-mix(in oklab, var(--solar) 20%, transparent), transparent 70%),
+  radial-gradient(600px 260px at 5% 0%, color-mix(in oklab, var(--demand) 10%, transparent), transparent 70%); }
+.hero-title { font-size: clamp(32px, 5vw, 56px); margin: 8px 0 12px; max-width: 20ch; }
+.tiles { margin-top: 24px; }
+.tile .label, .metric .label { font-size: 13px; color: var(--ink-2); }
+.tile .value, .metric .value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }
+.tile .sub, .metric .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.card-title { font-size: 16px; margin-bottom: 4px; }
+.card-sub { margin-bottom: 8px; }
+.prose p, .prose ul { color: var(--ink-2); font-size: 14px; margin: 0 0 10px; }
+.prose ul { padding-left: 18px; }
+.prose li { margin-bottom: 6px; }
+.prose h3 { font-size: 16px; margin-bottom: 10px; }
+.prose b { color: var(--ink); font-weight: 600; }
+.sources a { color: var(--ink); }

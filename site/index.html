@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    // Apply saved theme and design skin before first paint (?skin=alt|classic overrides and is remembered)
+    (function () { try { var r = document.documentElement, q = new URLSearchParams(location.search).get("skin");
+      var t = localStorage.getItem("odp-theme"); if (t) r.dataset.theme = t;
+      if (q) localStorage.setItem("odp-skin", q);
+      if ((q || localStorage.getItem("odp-skin")) === "alt") r.dataset.skin = "alt"; } catch (e) {} })();
+  </script>
+  <title>California Duck Curve</title>
+  <meta name="description" content="California's power grid from CAISO's open data: tomorrow's demand and net-demand forecast scored against the grid operator, the deepening duck curve, and how batteries now move solar into the evening." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=B612:ital,wght@0,400;0,700;1,400&family=B612+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/shared/theme.css" />
+  <link rel="stylesheet" href="./src/grid/grid.css" />
+  <link rel="stylesheet" href="./src/grid/skin.css" />
+</head>
+<body class="grid-page">
+  <header class="topbar">
+    <span class="title">California Duck Curve</span>
+    <span class="spacer"></span>
+    <button class="skin-btn" id="skin" type="button" data-skin-name="Control Room"></button>
+    <button class="icon-btn" id="theme" type="button"></button>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="eyebrow" id="tomorrow-label">California's grid, tomorrow</div>
+        <h1 class="hero-title">When the sun sets, the duck stands up</h1>
+        <p class="lede">At midday, solar power floods California's grid and the demand left for other sources (net demand) sinks into the duck's belly. At sunset it surges back into the neck. Here's tomorrow's curve, forecast from open data and scored against the grid operator's own forecast.</p>
+        <div class="grid cols-4 tiles" id="tiles"></div>
+        <div class="card" style="margin-top:16px">
+          <h3 class="card-title" id="fc-title">Tomorrow, hour by hour</h3>
+          <div class="legend" id="fc-legend"></div>
+          <div class="chart" id="forecast"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head"><div>
+          <div class="eyebrow">Scoreboard</div>
+          <h2>Can open data match the grid operator?</h2>
+          <p id="score-sub">CAISO publishes its own day-ahead demand forecast. Mine uses only public weather and yesterday's public grid data. Both are scored on the same hours since mid-2025, which my model never saw.</p>
+        </div></div>
+        <div class="grid cols-4" id="score-tiles"></div>
+        <div class="grid cols-2" style="margin-top:16px">
+          <div class="card"><h3 class="card-title">Daily average error, MW</h3><div class="legend" id="score-legend"></div><div class="chart" id="score-daily"></div></div>
+          <div class="card"><h3 class="card-title">Where in the day the forecast misses</h3><p class="note card-sub">Average error by hour of day (net demand, test period). Midday is the hardest to call: net demand there hinges on how much sun gets through the clouds.</p><div class="chart" id="score-hour"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head"><div>
+          <div class="eyebrow">The duck</div>
+          <h2>The duck is getting deeper every spring</h2>
+          <p>Median net demand by hour on spring weekdays (March–April), one line per year. Each year more solar pushes the midday belly lower, while the evening neck barely moves.</p>
+        </div></div>
+        <div class="grid cols-2">
+          <div class="card"><div class="legend" id="duck-legend"></div><div class="chart" id="duck"></div><p class="note" id="duck-note"></p></div>
+          <div class="card"><h3 class="card-title">Batteries now move sunshine into the evening</h3><p class="note card-sub">Average battery output by hour, April–September. Below zero they're charging on midday solar; above zero they're powering the evening peak.</p><div class="legend" id="batt-legend"></div><div class="chart" id="batt"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head"><div>
+          <div class="eyebrow">Latest full day</div>
+          <h2 id="mix-title">Where yesterday's power came from</h2>
+          <p>CAISO's five-minute generation mix, averaged to 15 minutes. Battery charging shows below the line.</p>
+        </div></div>
+        <div class="grid cols-2">
+          <div class="card"><div class="legend" id="mix-legend"></div><div class="chart" id="mix"></div></div>
+          <div class="card"><h3 class="card-title">Share of demand met by renewables</h3><p class="note card-sub">Solar, wind, geothermal, biomass, biogas and small hydro over total demand, by calendar year. Large hydro isn't counted, following California's definition. * Year to date, so not directly comparable with full years.</p><div class="chart" id="ren"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="grid cols-2">
+          <div class="card prose">
+            <h3>Method</h3>
+            <p><b>Forecast.</b> One gradient-boosted model per target (gross demand, and net demand = demand − solar − wind) at hourly resolution. Inputs:</p>
+            <ul>
+              <li>Hour, weekday, California holidays, season and a slow trend.</li>
+              <li>Temperature at six load centres, plus the previous day's inland peak heat.</li>
+              <li>Solar radiation and cloud over the Mojave and Central Valley, and wind at the Tehachapi–Mojave wind belt.</li>
+              <li>Load at the same hour two and seven days earlier, which is all that's known when a day-ahead forecast is made.</li>
+            </ul>
+            <p>The model is trained January 2020 to June 2025 and tested from July 2025, and the 80% bands come from test errors by hour.</p>
+            <p><b>Data.</b> CAISO "Today's Outlook" five-minute history, averaged to the hour. Weather is from ERA5 reanalysis for training and the forecast for tomorrow (Open-Meteo).</p>
+          </div>
+          <div class="card prose">
+            <h3>Honest limitations</h3>
+            <ul>
+              <li>Training on reanalysis weather but forecasting with forecast weather flatters the test score a little. Real-time errors will be somewhat larger.</li>
+              <li>CAISO's forecast covers a slightly different footprint and is built with far more inputs, including behind-the-meter solar estimates, so the comparison shows how close public data gets, not a like-for-like contest.</li>
+              <li>Net demand here subtracts only grid-scale solar and wind that CAISO reports. Rooftop solar shows up as lower demand.</li>
+              <li>"Today's Outlook" is CAISO's preliminary operational data, revised later in its settled datasets.</li>
+            </ul>
+            <h3 style="margin-top:16px">Data sources</h3>
+            <ul class="sources">
+              <li><a href="https://www.caiso.com/todays-outlook">California ISO, Today's Outlook</a>: supply, demand and day-ahead forecast history</li>
+              <li>Weather: <a href="https://open-meteo.com/">Open-Meteo</a> (ERA5 reanalysis and forecast models, CC BY 4.0)</li>
+            </ul>
+            <p class="note" id="generated"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="site"><div class="wrap">California Duck Curve is part of an open-data portfolio. Data refreshes daily.</div></footer>
+  <script type="module" src="./src/grid/main.js"></script>
+</body>
+</html>
