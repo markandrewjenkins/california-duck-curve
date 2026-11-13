@@ -537,3 +537,9 @@
 }
 .cr-mimic .nd2 { fill: none; }
 :root[data-skin="alt"] body.grid-page { font-variant-numeric: tabular-nums; }
+
+/* mimic board: output columns (height = MW, one scale for all sources and times) */
+:root[data-skin="alt"] .cr-mimic-svg .col { fill-opacity: 0.32; stroke-width: 1.5; }
+:root[data-skin="alt"] .cr-mimic-svg .col.chg { fill-opacity: 0.12; stroke-dasharray: 3 2; }
+:root[data-skin="alt"] .cr-mimic-svg .dead .col { opacity: 0.35; }
+:root[data-skin="alt"] .cr-mimic-svg text.mw, :root[data-skin="alt"] .cr-mimic-svg text.tag { text-anchor: middle; }

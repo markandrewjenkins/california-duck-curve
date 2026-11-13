@@ -1,14 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page="grid">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script>
-    // Apply saved theme and design skin before first paint (?skin=alt|classic overrides and is remembered)
+    // Apply saved theme and design skin before first paint. <html data-skins="alt herbarium …"> lists this page's
+    // themed designs; ?skin=<id>|classic overrides and is remembered. "alt" is shared across pages; other ids per page.
     (function () { try { var r = document.documentElement, q = new URLSearchParams(location.search).get("skin");
       var t = localStorage.getItem("odp-theme"); if (t) r.dataset.theme = t;
-      if (q) localStorage.setItem("odp-skin", q);
-      if ((q || localStorage.getItem("odp-skin")) === "alt") r.dataset.skin = "alt"; } catch (e) {} })();
+      var multi = !!r.dataset.skins, ok = (r.dataset.skins || "alt").split(" "), pk = "odp-skin:" + (r.dataset.page || location.pathname);
+      if (q) { if (multi) localStorage.setItem(pk, q); if (q === "alt" || q === "classic") localStorage.setItem("odp-skin", q); }
+      var s = q || (multi && localStorage.getItem(pk)) || localStorage.getItem("odp-skin");
+      if (ok.indexOf(s) >= 0) r.dataset.skin = s; } catch (e) {} })();
   </script>
   <title>California Duck Curve</title>
   <meta name="description" content="California's power grid from CAISO's open data: tomorrow's demand and net-demand forecast scored against the grid operator, the deepening duck curve, and how batteries now move solar into the evening." />

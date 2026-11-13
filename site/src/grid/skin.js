@@ -143,6 +143,16 @@ function glyph(kind, x, y, r, v) {
   }
 }
 
+// largest single source (or battery swing) over the whole mix day, so column heights compare across the SCAN slider
+let dayMax = 0;
+function mixDayMax() {
+  if (dayMax) return dayMax;
+  for (let i = 0; i < G.mix.ts.length; i++) for (const v of mixAt(i).out) dayMax = Math.max(dayMax, Math.abs(v));
+  return dayMax || 1;
+}
+
+// One-line diagram: each source is a column whose height is its output (same scale for every source and every time of
+// day), feeding the bus through its breaker; battery charging hangs below the bus.
 function mimicSVG(W, i) {
   const { out, load } = mixAt(i);
   const compact = W < 640;
@@ -151,41 +161,51 @@ function mimicSVG(W, i) {
   const bx0 = compact ? 6 : 16, bx1 = W - loadW - (compact ? 10 : 30);
   const perRow = compact ? n / 2 : n;
   const slot = (bx1 - bx0) / perRow;
-  const H = compact ? 196 : 176;
-  const busY = compact ? 98 : 132;
-  const r = compact ? 11 : 15;
+  const H = compact ? 300 : 268;
+  const busY = compact ? 150 : 196;
+  const maxH = compact ? 78 : 120;                 // column height at the day's largest source
+  const below = compact ? 0 : 52;                  // room under the bus for battery charging
+  const bw = Math.max(10, Math.min(compact ? 22 : 40, slot * 0.46));
+  const r = compact ? 8 : 10;
   const fs = compact ? 9 : 11;
-  const speed = (mw) => 24 / (3 + Math.abs(mw) / 170); // seconds per 2 dot-pitches
+  const mx = mixDayMax();
+  const speed = (mw) => 24 / (3 + Math.abs(mw) / 170);
   let s = "";
   SRC.forEach(([name, short, v, , kind], k) => {
     const mw = out[k];
     const bottom = compact && k >= perRow;
+    const dir = bottom ? 1 : -1;                    // columns grow away from the bus
     const col = compact ? k % perRow : k;
     const x = Math.round(bx0 + slot * (col + 0.5));
-    const ny = compact ? (bottom ? busY + 62 : busY - 62) : 50;
-    const label = compact ? short : name;
-    const nameY = bottom ? ny + r + 15 : ny - r - 8;
-    const brY = bottom ? busY + 20 : busY - 20;
-    const valY = compact ? (bottom ? busY + 41 : busY - 32) : ny + r + 18;
     const live = Math.abs(mw) >= 1;
     const chg = kind === "batt" && mw < -1;
-    // feeder: node -> breaker -> bus (path direction is the power-flow direction)
-    const yA = bottom ? ny - r : ny + r;
-    const d = `M${x} ${yA}V${busY}`;
-    const sw = Math.min(5, 2.6 + Math.abs(mw) / 4000).toFixed(1);
+    const h = Math.max(live ? 2 : 0, (Math.abs(mw) / mx) * maxH);
+    const brY = busY + dir * 14;
+    const base = busY + dir * 24;                   // column foot (breaker sits between it and the bus)
+    // charging draws power off the bus: hang that column on the far side of the bus
+    const cDir = chg && !compact ? 1 : dir;
+    const cBase = chg && !compact ? busY + 12 : base;
+    const top = cBase + cDir * h;
+    const share = load > 0 && !chg ? Math.round((100 * mw) / load) : null;
     s += `<g class="feeder${live ? "" : " dead"}">`;
+    const d = `M${x} ${cBase}V${busY}`;
     s += `<path class="ln" d="${d}" style="stroke:var(${v})"/>`;
-    if (live) s += `<path class="flow${chg ? " rev" : ""}" d="${d}" style="stroke:var(${v});stroke-width:${sw};animation-duration:${speed(mw).toFixed(2)}s"/>`;
-    s += `<rect class="brk${live ? " closed" : ""}" x="${x - 5}" y="${brY - 5}" width="10" height="10" style="stroke:var(${v});${live ? `fill:var(${v})` : ""}"/>`;
-    s += glyph(kind, x, ny, r, v);
-    s += `<text class="nm" x="${x}" y="${nameY}" font-size="${fs}">${label}</text>`;
+    if (live) s += `<path class="flow${chg ? " rev" : ""}" d="${d}" style="stroke:var(${v});stroke-width:${Math.min(5, 2.6 + Math.abs(mw) / 4000).toFixed(1)};animation-duration:${speed(mw).toFixed(2)}s"/>`;
+    if (!chg || compact) s += `<rect class="brk${live ? " closed" : ""}" x="${x - 4}" y="${brY - 4}" width="8" height="8" style="stroke:var(${v});${live ? `fill:var(${v})` : ""}"/>`;
+    const y0 = Math.min(cBase, top), y1 = Math.max(cBase, top);
+    s += `<rect class="col${chg ? " chg" : ""}" x="${x - bw / 2}" y="${y0}" width="${bw}" height="${Math.max(0, y1 - y0)}" rx="2"
+      style="stroke:var(${v});fill:var(${v})"/>`;
+    // symbol, name and value beyond the column's end
+    const gy = chg && !compact ? Math.max(y1 + r + 4, busY + 30) : top + cDir * (r + 4);
+    s += glyph(kind, x, gy, r, v);
+    const tY = cDir < 0 ? gy - r - 6 : gy + r + fs + 2;
+    const tY2 = cDir < 0 ? tY - fs - 2 : tY + fs + 2;
+    s += `<text class="nm" x="${x}" y="${cDir < 0 ? tY2 : tY}" font-size="${fs}">${compact ? short : name}</text>`;
     const valTxt = compact ? `${chg ? "−" : ""}${gw(Math.abs(mw))}` : `${chg ? "−" : ""}${fmtMW(Math.abs(mw))} MW`;
-    const vx = x + (compact ? 6 : 9);
-    s += `<text class="mw${chg ? " chg" : ""}" x="${vx}" y="${valY}" font-size="${fs + (compact ? 0.5 : 1)}" text-anchor="start">${valTxt}</text>`;
-    if (kind === "batt") s += `<text class="tag" x="${vx}" y="${valY + fs + 1}" font-size="${fs - (compact ? 2 : 1.5)}" text-anchor="start">${compact ? (chg ? "CHG" : live ? "DIS" : "") : chg ? "CHARGING" : live ? "DISCHARGE" : "IDLE"}</text>`;
+    s += `<text class="mw${chg ? " chg" : ""}" x="${x}" y="${cDir < 0 ? tY : tY2}" font-size="${fs + (compact ? 0 : 0.5)}">${valTxt}${!compact && share != null && live ? ` · ${share}%` : ""}</text>`;
+    if (kind === "batt" && !compact) s += `<text class="tag" x="${x}" y="${(cDir < 0 ? tY : tY2) + (cDir < 0 ? -fs * 2 - 4 : fs + 2)}" font-size="${fs - 1.5}">${chg ? "CHARGING" : live ? "DISCHARGE" : "IDLE"}</text>`;
     s += "</g>";
   });
-  // bus bar and the tie to LOAD
   const lx = W - loadW, ly0 = busY - (compact ? 26 : 34), lh = compact ? 52 : 68;
   s = `<path class="bus" d="M${bx0} ${busY}H${bx1}"/>` + s;
   s += `<path class="tie" d="M${bx1} ${busY}H${lx}"/><path class="flow bus-flow" d="M${bx0} ${busY}H${lx - 6}" style="animation-duration:${speed(load / 3).toFixed(2)}s"/>`;
@@ -196,8 +216,8 @@ function mimicSVG(W, i) {
   const seg = sevenSeg(compact ? gw(load) : String(Math.round(load)), "load");
   const segH = compact ? 24 : 34;
   s += `<g transform="translate(${lx + 8} ${ly0 + lh - segH - 7}) scale(${segH / 38})">${seg.replace(/<svg[^>]*>/, '<g class="cr-seg load">').replace("</svg>", "</g>")}</g>`;
-  s += `<text class="bus-lbl" x="${bx0}" y="${busY + (compact ? -6 : 18)}" font-size="${fs - 1.5}">${compact ? "GW" : "SYSTEM BUS · CAISO BA"}</text>`;
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${s}</svg>`;
+  s += `<text class="bus-lbl" x="${bx0}" y="${busY + (compact ? -6 : 16)}" font-size="${fs - 1.5}" text-anchor="start">${compact ? "GW" : "SYSTEM BUS · CAISO BA · column height = output"}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H + below * 0}" width="${W}" height="${H}" aria-hidden="true">${s}</svg>`;
 }
 
 function mimic() {
@@ -235,7 +255,6 @@ function titleBlock() {
   const block = el("div", { class: "cr-titleblock", "aria-hidden": "true" },
     c("TITLE", "CALIFORNIA DUCK CURVE · NET DEMAND, GENERATION & STORAGE", "tb-title"),
     c("DWG NO.", "CA-DUCK-07"), c("SHEET", "1 OF 1"), c("SCALE", "NTS"), c("DATA", "CAISO"),
-    c("REV", `${gen.getUTCFullYear()}-${String(gen.getUTCMonth() + 1).padStart(2, "0")}-${String(gen.getUTCDate()).padStart(2, "0")}`),
-    el("div", { class: "tb tb-flavour" }, el("span", { class: "fl-night" }, "Night shift. The duck is roosting; watch the neck at sunset."), el("span", { class: "fl-day" }, "Checked in red pencil. Approved by the sun.")));
+    c("REV", `${gen.getUTCFullYear()}-${String(gen.getUTCMonth() + 1).padStart(2, "0")}-${String(gen.getUTCDate()).padStart(2, "0")}`));
   document.querySelector("footer.site .wrap").append(add(block));
 }
